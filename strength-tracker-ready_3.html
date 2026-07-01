@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>12-Week Build · Strength Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#1a1f1c;
+    --paper:#f3f0e7;
+    --paper-2:#e8e3d5;
+    --sage:#5a6b54;
+    --sage-deep:#3d4a39;
+    --clay:#b56a47;
+    --clay-soft:#d99b78;
+    --line:#cfc8b6;
+    --good:#5a6b54;
+    --pr:#b56a47;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:60px;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:0 18px}
+  header.top{
+    padding:30px 18px 22px;
+    border-bottom:2px solid var(--ink);
+    margin-bottom:0;
+  }
+  header.top .wrap{padding:0}
+  .eyebrow{
+    font-family:'Courier New',monospace;
+    font-size:12px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--clay);
+    margin-bottom:8px;
+  }
+  h1{
+    font-size:clamp(30px,6vw,52px);
+    font-weight:400;
+    line-height:.98;
+    letter-spacing:-.01em;
+  }
+  h1 em{font-style:italic;color:var(--sage)}
+  .sub{margin-top:10px;font-size:15px;max-width:60ch;color:var(--sage-deep)}
+
+  /* week strip */
+  .weekstrip{
+    display:flex;gap:6px;overflow-x:auto;padding:16px 0 14px;
+    border-bottom:1px solid var(--line);
+  }
+  .wk{
+    flex:0 0 auto;min-width:54px;text-align:center;cursor:pointer;
+    padding:8px 6px;border:1px solid var(--line);border-radius:2px;
+    background:transparent;font-family:'Courier New',monospace;font-size:11px;
+    letter-spacing:.05em;color:var(--sage-deep);transition:.15s;
+  }
+  .wk b{display:block;font-size:18px;font-family:'Iowan Old Style',Georgia,serif;letter-spacing:0}
+  .wk small{display:block;font-size:9px;opacity:.6;text-transform:uppercase}
+  .wk:hover{border-color:var(--sage)}
+  .wk.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .wk.active small{opacity:.7}
+  .wk.done{border-color:var(--sage);color:var(--sage)}
+  .wk.active.done{color:var(--paper)}
+
+  .phasebar{
+    display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+    padding:18px 0 6px;
+  }
+  .phase-tag{
+    font-family:'Courier New',monospace;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;padding:3px 9px;border-radius:2px;color:var(--paper);
+  }
+  .phase-name{font-size:22px;font-style:italic}
+  .phase-focus{font-size:13px;color:var(--sage-deep);font-family:'Courier New',monospace}
+
+  /* day cards */
+  .viewtoggle{display:flex;gap:6px;margin:6px 0 2px;border-bottom:1px solid var(--line)}
+  .vt-btn{flex:1;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;padding:11px 8px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--sage-deep)}
+  .vt-btn.active{color:var(--ink);border-bottom-color:var(--clay)}
+  .dash-hero{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+  .dash-stat{background:var(--paper-2);border:1px solid var(--line);border-radius:3px;padding:16px}
+  .dash-stat .big{font-size:42px;line-height:1;font-family:'Iowan Old Style',Georgia,serif}
+  .dash-stat .big small{font-size:15px;color:var(--sage-deep);font-family:'Courier New',monospace}
+  .dash-stat .lbl{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--clay);margin-bottom:8px}
+  .dash-stat .sub{font-size:12px;color:var(--sage-deep);margin-top:6px}
+  .dash-sec{margin-top:26px;border-top:2px solid var(--ink);padding-top:18px}
+  .dash-sec h2{font-size:13px;font-family:'Courier New',monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--clay);margin-bottom:14px}
+  .heat{display:grid;grid-template-columns:auto repeat(5,1fr);gap:5px;align-items:center}
+  .heat .hlabel{font-family:'Courier New',monospace;font-size:10px;color:var(--sage-deep);text-transform:uppercase;letter-spacing:.05em}
+  .heat .hcol{font-family:'Courier New',monospace;font-size:9px;color:var(--sage-deep);text-align:center}
+  .heat .cell{aspect-ratio:1;border-radius:2px;border:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent}
+  .heat .cell.done{background:var(--sage);border-color:var(--sage);color:var(--paper)}
+  .heat .cell.opt{border-style:dashed}
+  .heat .cell.optdone{background:var(--clay);border-color:var(--clay);color:var(--paper)}
+  .chartwrap svg{display:block;width:100%;height:auto}
+  .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .chip{background:var(--paper-2);border:1px solid var(--line);border-radius:14px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'Courier New',monospace;letter-spacing:.03em;color:var(--sage-deep)}
+  .chip.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .vol-bars{display:flex;align-items:flex-end;gap:5px;height:130px;border-bottom:1px solid var(--line)}
+  .vol-bar{flex:1;background:var(--sage);border-radius:2px 2px 0 0;min-height:2px;position:relative}
+  .vol-bar span{position:absolute;top:-15px;left:0;right:0;text-align:center;font-size:9px;font-family:'Courier New',monospace;color:var(--sage-deep)}
+  .vol-labels{display:flex;gap:5px;margin-top:4px}
+  .vol-labels span{flex:1;text-align:center;font-size:9px;font-family:'Courier New',monospace;color:var(--sage-deep)}
+  .dash-empty{font-style:italic;color:var(--sage-deep);font-size:14px}
+  .pr-table{width:100%;border-collapse:collapse;font-size:14px}
+  .pr-table th{text-align:left;font-family:'Courier New',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage-deep);font-weight:400;padding:0 0 8px}
+  .pr-table td{padding:9px 0;border-top:1px solid var(--line)}
+  .pr-table td.wk{font-family:'Courier New',monospace;font-size:12px;color:var(--sage-deep);width:64px}
+  .pr-table td.val{font-size:15px;color:var(--ink)}
+  .pr-table td.tr{text-align:right;width:28px}
+  .pr-table .tr-up{color:var(--sage);font-size:12px}
+  .pr-table .tr-down{color:var(--clay);font-size:12px}
+  .pr-table .tr-same{color:var(--sage-deep);opacity:.5}
+  .days{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+  .day{
+    background:var(--paper-2);border:1px solid var(--line);border-radius:3px;
+    position:relative;overflow:hidden;
+  }
+  .day.rest{background:transparent;border-style:dashed;opacity:.92}
+  .day.done{border-color:var(--sage)}
+  .day-head{
+    width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
+    background:none;border:none;cursor:pointer;text-align:left;padding:14px 16px;
+  }
+  .day-headL{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .day-headR{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+  .day-tag{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--clay)}
+  .day-name{font-size:19px;font-weight:400;letter-spacing:-.01em;color:var(--ink)}
+  .day-name .where{font-size:11px;font-family:'Courier New',monospace;color:var(--sage);letter-spacing:.08em;text-transform:uppercase;display:block;margin-top:2px}
+  .day-check{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--sage);color:var(--paper);font-size:14px;font-weight:700}
+  .day-caret{font-family:'Courier New',monospace;font-size:20px;color:var(--sage-deep);width:18px;text-align:center}
+  .day-body{padding:0 16px 14px}
+  .day.done .day-head{background:rgba(90,107,84,.07)}
+
+  .ex{border-top:1px solid var(--line);padding:9px 0 8px}
+  .ex:first-of-type{border-top:none}
+  .ex-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .ex-name{font-size:15px;font-weight:600}
+  .ex-prescr{font-family:'Courier New',monospace;font-size:12px;color:var(--sage-deep);white-space:nowrap}
+  .ex-note{font-size:12px;color:var(--sage-deep);font-style:italic;margin-top:2px}
+  .ex-log{display:flex;gap:6px;margin-top:7px;align-items:center}
+  .setnum{font-family:'Courier New',monospace;font-size:11px;color:var(--sage-deep);width:14px;text-align:center;flex:0 0 auto}
+  .setlist{margin-top:2px}
+  .addset{margin-top:8px;background:none;border:1px dashed var(--line);color:var(--sage-deep);font-family:'Courier New',monospace;font-size:11px;letter-spacing:.08em;padding:5px 11px;border-radius:2px;cursor:pointer}
+  .addset:hover{border-color:var(--sage);color:var(--sage)}
+  .exnote{display:block;width:100%;margin-top:8px;border:none;border-bottom:1px dotted var(--line);background:transparent;padding:4px 2px;font-family:'Iowan Old Style',Georgia,serif;font-size:13px;font-style:italic;color:var(--ink)}
+  .lastwk-btn{margin-top:6px;background:none;border:1px solid var(--line);color:var(--sage-deep);font-family:'Courier New',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:2px;cursor:pointer}
+  .lastwk-btn:hover{border-color:var(--sage);color:var(--sage)}
+  .lastwk-btn.open{background:var(--sage);color:var(--paper);border-color:var(--sage)}
+  .lastwk-panel{margin-top:7px;padding:9px 11px;background:var(--paper);border:1px solid var(--line);border-radius:2px;font-size:12.5px;color:var(--sage-deep)}
+  .lastwk-panel .lw-head{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--clay);margin-bottom:4px}
+  .lastwk-panel .lw-sets{display:flex;flex-wrap:wrap;gap:4px 12px}
+  .lastwk-panel .lw-set{font-family:'Courier New',monospace;font-size:12.5px;color:var(--ink)}
+  .lastwk-panel .lw-note{font-style:italic;margin-top:5px}
+  .lastwk-panel .lw-empty{font-style:italic;opacity:.8}
+  .exnote:focus{outline:none;border-bottom-color:var(--clay)}
+  .exnote::placeholder{color:var(--sage-deep);opacity:.55}
+  .setdel{background:none;border:none;color:var(--clay-soft);font-size:18px;line-height:1;cursor:pointer;padding:0 4px;flex:0 0 auto}
+  .setdel:hover{color:var(--clay)}
+  .bwpill{flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--sage-deep);font-family:'Courier New',monospace;font-size:11px;letter-spacing:.05em;padding:5px 9px;border-radius:2px;cursor:pointer}
+  .bwpill.active{background:var(--sage);color:var(--paper);border-color:var(--sage)}
+  .bwpill:hover{border-color:var(--sage)}
+  .ex-log input{
+    width:58px;padding:5px 6px;border:1px solid var(--line);border-radius:2px;
+    background:var(--paper);font-family:'Courier New',monospace;font-size:13px;color:var(--ink);
+  }
+  .ex-log input:focus{outline:none;border-color:var(--clay)}
+  .ex-log .unit{font-size:11px;color:var(--sage-deep);font-family:'Courier New',monospace}
+  .pr-flag{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.1em;color:var(--paper);background:var(--clay);padding:2px 6px;border-radius:2px;text-transform:uppercase;display:none}
+  .pr-flag.show{display:inline-block}
+
+  .rest-body{font-size:14px;color:var(--sage-deep);font-style:italic;padding:6px 0 2px}
+  .rest-opts{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .rest-opts label{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;cursor:pointer}
+  .rest-opts input{margin-top:3px}
+
+  .notewrap{margin-top:12px}
+  .notebox{width:100%;min-height:38px;resize:vertical;border:1px solid var(--line);border-radius:2px;background:var(--paper);padding:7px 9px;font-family:'Iowan Old Style',Georgia,serif;font-size:13.5px;color:var(--ink);line-height:1.4}
+  .notebox:focus{outline:none;border-color:var(--clay)}
+  .notebox::placeholder{color:var(--sage-deep);opacity:.6;font-style:italic}
+  .hnote{font-style:italic;color:var(--sage-deep);margin-top:4px;font-size:13px}
+  .donerow{margin-top:14px;display:flex;align-items:center;gap:8px;border-top:1px dashed var(--line);padding-top:11px}
+  .donerow label{font-family:'Courier New',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;color:var(--sage-deep)}
+  .donerow input{width:17px;height:17px;accent-color:var(--sage)}
+
+  /* PR board */
+  .board{margin-top:40px;border-top:2px solid var(--ink);padding-top:22px}
+  .board h2,.guide h2{font-size:13px;font-family:'Courier New',monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--clay);margin-bottom:14px}
+  .pr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .pr-card{border:1px solid var(--line);border-radius:3px;padding:13px 14px;background:var(--paper-2)}
+  .pr-card .lift{font-size:15px;font-weight:600;margin-bottom:6px}
+  .pr-card .val{font-size:30px;font-family:'Iowan Old Style',Georgia,serif;line-height:1}
+  .pr-card .val small{font-size:13px;color:var(--sage-deep);font-family:'Courier New',monospace}
+  .pr-card .when{font-size:11px;color:var(--sage-deep);font-family:'Courier New',monospace;margin-top:5px}
+  .pr-card .empty{font-size:13px;color:var(--sage-deep);font-style:italic}
+
+  .guide{margin-top:40px;border-top:2px solid var(--ink);padding-top:22px}
+  .guide ul{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .guide li{border-left:3px solid var(--sage);padding:2px 0 2px 13px;font-size:14px}
+  .guide li b{display:block;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--clay);margin-bottom:3px}
+
+  .resetbar{margin-top:34px;text-align:center}
+  .resetbar button{background:none;border:1px solid var(--line);color:var(--sage-deep);font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:8px 16px;border-radius:2px;cursor:pointer}
+  .resetbar button:hover{border-color:var(--clay);color:var(--clay)}
+  .saved{font-family:'Courier New',monospace;font-size:11px;color:var(--sage);opacity:0;transition:.3s;margin-left:10px}
+  .saved.show{opacity:1}
+  .hist-row{border-left:3px solid var(--clay);padding:8px 0 8px 13px;margin-bottom:10px;font-size:13.5px}
+  .hist-row .hh{font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage-deep);margin-bottom:3px}
+  .hist-row .hh b{color:var(--ink)}
+  .hist-row .hsets{color:var(--sage-deep)}
+  .hist-empty{font-size:13px;color:var(--sage-deep);font-style:italic}
+  @media(max-width:560px){h1{font-size:34px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">Twelve weeks · back-safe rebuild</div>
+    <h1>The <em>Slow Burn</em> Build</h1>
+    <p class="sub">Strength that respects your low back. Two gym days, one home session, one mobility-or-run day. Log it, chase the PRs, build the habit. <em id="syncStatus" style="color:var(--clay);font-style:normal;font-family:'Courier New',monospace;font-size:12px">Connecting…</em></p>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="viewtoggle">
+    <button id="tabWorkouts" class="vt-btn active" data-view="workouts">Workouts</button>
+    <button id="tabDash" class="vt-btn" data-view="dashboard">Dashboard</button>
+  </div>
+
+  <div id="view-workouts">
+  <div class="weekstrip" id="weekstrip"></div>
+
+  <div class="phasebar" id="phasebar"></div>
+
+  <div id="warmupBox" style="margin:18px 0 0;border:1px dashed var(--line);border-radius:3px;background:var(--paper-2);overflow:hidden">
+    <button id="warmupToggle" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:13px 16px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--clay);display:flex;justify-content:space-between;align-items:center">
+      <span id="warmupLabel">▸ Warm-up <span style="color:var(--sage-deep);letter-spacing:.04em">— 5–8 min before lifting</span></span>
+      <span id="warmupCaret">+</span>
+    </button>
+    <div id="warmupBody" style="display:none;padding:2px 16px 16px;font-size:14px;color:var(--sage-deep)"></div>
+  </div>
+
+  <div class="days" id="days"></div>
+
+  <div class="board">
+    <h2>Personal Records</h2>
+    <div class="pr-grid" id="prgrid"></div>
+  </div>
+
+  <div class="board" id="historyBoard">
+    <h2>Session History</h2>
+    <div id="historyList"></div>
+  </div>
+
+  <div class="guide">
+    <h2>How to run it</h2>
+    <ul>
+      <li><b>Progression rule</b>When you hit the top of a rep range with good form & no back flare, add the smallest load next session. Reps before weight.</li>
+      <li><b>The back test</b>If a movement causes sharp or lingering low-back pain (not muscle fatigue), stop the set. Soreness next day is fine; pain that lingers 48h+ means regress.</li>
+      <li><b>Bracing</b>Every hinge and carry: exhale, ribs down, brace like someone's about to poke your stomach. This is your insurance.</li>
+      <li><b>One hard day max</b>Only the heaviest gym day should feel genuinely tough early on. Build, don't grind.</li>
+      <li><b>Tracking</b>Log weight × reps (or time) each session. Everything saves to your Supabase backend and syncs across phone and laptop. The status line up top shows "Synced" when it's saved. Offline? It caches on the device and pushes once you're back.</li>
+    </ul>
+  </div>
+
+  <div class="resetbar">
+    <button id="resetBtn">Reset all logged data</button>
+    <span class="saved" id="savedMsg">saved</span>
+  </div>
+  </div><!-- /view-workouts -->
+
+  <div id="view-dashboard" style="display:none">
+    <div id="dashInner"></div>
+  </div>
+</div>
+
+<script>
+const PHASES = [
+  {weeks:[1,2,3,4], name:'Reawaken', tag:'Phase 1', color:'#5a6b54', focus:'movement quality · light load · build the habit'},
+  {weeks:[5,6,7,8], name:'Load', tag:'Phase 2', color:'#b56a47', focus:'progressive overload · core under tension'},
+  {weeks:[9,10,11,12], name:'Express', tag:'Phase 3', color:'#3d4a39', focus:'heavier sets · test your PRs'}
+];
+
+// exercise prescriptions shift by phase index (0,1,2)
+function presc(p, a, b, c){ return [a,b,c][p]; }
+
+function buildWeek(week){
+  const p = week<=4?0:week<=8?1:2;
+  return [
+    {
+      tag:'Day 1 · Gym', name:'Lower · Hinge & Glute', where:'Commercial gym',
+      ex:[
+        {id:'gm_hinge', name:presc(p,'Hip Thrust (DB/bar)','Barbell Hip Thrust','Barbell Hip Thrust'), pr:presc(p,'3 × 12','4 × 10','4 × 8'), unit:'lb', note:'Squeeze glutes, ribs down. Your #1 back-protector.'},
+        {id:'gm_rdl', name:presc(p,'DB Romanian Deadlift','DB / Light Bar RDL','Barbell RDL'), pr:presc(p,'3 × 10','3 × 8','4 × 6'), unit:'lb', note:'Slow, soft knees, stop at mid-shin. Hinge, never round.'},
+        {id:'gm_split', name:'Goblet Split Squat', pr:presc(p,'3 × 10 ea','3 × 10 ea','3 × 8 ea'), unit:'lb', note:'Tall torso, controlled. Builds single-leg stability.'},
+        {id:'gm_abd', name:'Cable / Band Hip Abduction', pr:presc(p,'3 × 15 ea','3 × 15 ea','3 × 12 ea'), unit:'lb', note:'Glute med focus — the muscle helping your back.'},
+        {id:'gm_pallof', name:'Pallof Press', pr:'3 × 12 ea', unit:'lb', note:'Anti-rotation core. Resist the twist.'}
+      ]
+    },
+    {
+      tag:'Day 2 · Home', name:'Upper · Push / Pull + Core', where:'Home · dumbbells & bands',
+      ex:[
+        {id:'hm_press', name:'DB Floor / Bench Press', pr:presc(p,'3 × 12','4 × 10','4 × 8'), unit:'lb', note:'Floor press is back-friendly — no arch needed.'},
+        {id:'hm_row', name:'DB Bent / Chest-Supported Row', pr:presc(p,'3 × 12','4 × 10','4 × 8'), unit:'lb', note:'Brace hard if bent over; chest-supported if any tension.'},
+        {id:'hm_ohp', name:'Half-Kneeling DB Press', pr:presc(p,'3 × 10','3 × 10','3 × 8'), unit:'lb', note:'Half-kneeling kills low-back compensation.'},
+        {id:'hm_bandpull', name:'Band Face Pull / Pull-Apart', pr:'3 × 20', unit:'reps', note:'Postural — feels great after desk days.'},
+        {id:'hm_roman', name:'Roman Chair Back Extension', pr:presc(p,'3 × 12','3 × 15','3 × 15'), unit:'lb', bw:true, note:'START bodyweight, partial range. This rebuilds the exact muscles you injured — go gently. Tap BW to log bodyweight sets.'}
+      ]
+    },
+    {
+      tag:'Day 3 · Gym', name:'Full Body · Squat & Carry', where:'Commercial gym',
+      ex:[
+        {id:'g2_squat', name:presc(p,'Goblet Squat','Goblet / Front Squat','Front or Box Squat'), pr:presc(p,'3 × 10','4 × 8','4 × 6'), unit:'lb', note:'Box squat option keeps depth honest & back safe.'},
+        {id:'g2_step', name:'Step-Up', pr:presc(p,'3 × 10 ea','3 × 10 ea','3 × 8 ea'), unit:'lb', note:'Drive through the heel, control the descent.'},
+        {id:'g2_pull', name:'Lat Pulldown / Assisted Pull-up', pr:presc(p,'3 × 10','4 × 8','4 × 8'), unit:'lb', note:''},
+        {id:'g2_carry', name:'Farmer Carry', pr:presc(p,'3 × 30s','3 × 40s','3 × 45s'), unit:'lb', note:'Tall, braced, smooth steps. Total-body & back armor.'},
+        {id:'g2_deadbug', name:'Weighted Dead Bug', pr:'3 × 10 ea', unit:'reps', note:'Low back stays glued to floor the whole time.'}
+      ]
+    },
+    {
+      tag:'Day 4 · Home', name:'Mobility or Easy Run', where:'Choose your recovery', rest:true, optional:true,
+      options:[
+        '20–30 min yoga flow — hips, T-spine, hamstrings (your blocks help here)',
+        'Easy 1.5–2 mi jog, conversational pace (~9:30+/mi). Walk breaks fine.',
+        'Glute-med circuit: clamshells, side-lying abduction, monster walks × 3 rounds'
+      ]
+    },
+    {
+      tag:'Day 5 · Home', name:'Bonus Recovery', where:'Optional · only if you want it', rest:true, optional:true,
+      options:[
+        '20–30 min yoga flow — hips, T-spine, hamstrings (your blocks help here)',
+        'Easy 1.5–2 mi jog, conversational pace (~9:30+/mi). Walk breaks fine.',
+        'Glute-med circuit: clamshells, side-lying abduction, monster walks × 3 rounds',
+        'Easy walk, foam roll, or full rest — recovery counts too'
+      ]
+    }
+  ];
+}
+
+// ============================================================
+//  SUPABASE CONFIG  —  fill these two in (see instructions)
+// ============================================================
+const SUPABASE_URL  = 'https://emztfdhqnozcgbhwmawx.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtenRmZGhxbm96Y2diaHdtYXd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MTEyOTksImV4cCI6MjA5NzM4NzI5OX0.Zri6_bLXqOSAaZ0G6jQcYR4Mm0Vk-rn7sPA6ffsJUL0';
+const ROW_ID = 'kiana';   // single shared row id; same on every device
+// ============================================================
+
+let sb = null;
+const configured = SUPABASE_URL && !SUPABASE_URL.startsWith('YOUR_');
+if(configured && window.supabase){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+}
+
+const KEY='slowburn_v1'; // local cache fallback
+let store = loadLocal();
+let curWeek = store.curWeek || 1;
+let uiOpen = {}; // runtime-only: which day cards are expanded (not synced)
+
+function blank(){ return {log:{},done:{},rest:{},best:{},history:[],notes:{},exnotes:{}}; }
+function loadLocal(){
+  try{
+    const d=JSON.parse(localStorage.getItem(KEY));
+    if(d){ return Object.assign(blank(), d); }
+  }catch(e){}
+  return blank();
+}
+function cacheLocal(){ try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){} }
+
+function setSync(txt, ok){
+  const el=document.getElementById('syncStatus'); if(!el) return;
+  el.textContent=txt;
+  el.style.color = ok===false ? '#b54747' : (ok===true ? 'var(--sage)' : 'var(--clay)');
+}
+
+// Pull remote data on startup; remote wins if it exists.
+async function loadRemote(){
+  if(!sb){ setSync('Local only — add Supabase keys to sync', false); return; }
+  try{
+    setSync('Connecting…');
+    const {data, error} = await sb.from('tracker_state').select('data').eq('id', ROW_ID).maybeSingle();
+    if(error) throw error;
+    if(data && data.data){
+      store = Object.assign(blank(), data.data);
+      curWeek = store.curWeek || curWeek;
+      recomputeBest();
+      cacheLocal();
+      renderAll();
+    }
+    setSync('Synced', true);
+  }catch(e){
+    setSync('Offline — saved on this device', false);
+  }
+}
+
+let saveTimer=null;
+function save(){
+  store.curWeek=curWeek;
+  cacheLocal();            // instant local cache
+  flashSaved();
+  if(!sb){ return; }
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(pushRemote, 600); // debounce network writes
+}
+async function pushRemote(){
+  try{
+    setSync('Saving…');
+    const {error} = await sb.from('tracker_state')
+      .upsert({id:ROW_ID, data:store, updated_at:new Date().toISOString()});
+    if(error) throw error;
+    setSync('Synced', true);
+  }catch(e){
+    setSync('Offline — will retry on next change', false);
+  }
+}
+let st;
+function flashSaved(){ const m=document.getElementById('savedMsg'); m.classList.add('show'); clearTimeout(st); st=setTimeout(()=>m.classList.remove('show'),900); }
+
+// PR tracking: best est. value per exercise id. For weight×reps we store epley-ish best; for time we store max seconds.
+function logKey(w,d,id){return `w${w}_d${d}_${id}`;}
+
+// Build a small summary of what was logged for the same exercise last week.
+function lastWeekSummary(di, exId){
+  const pw=curWeek-1;
+  if(pw<1) return "<span class='lw-empty'>No previous week.</span>";
+  const lk=logKey(pw, di, exId);
+  const entry=store.log[lk];
+  const sets=(entry&&Array.isArray(entry.sets))?entry.sets.filter(s=>s.weight!=null||s.reps!=null):[];
+  const note=(store.exnotes&&store.exnotes[lk])?store.exnotes[lk]:'';
+  let out="<div class='lw-head'>Week "+pw+"</div>";
+  if(!sets.length){
+    out+="<span class='lw-empty'>Nothing logged last week.</span>";
+  } else {
+    out+="<div class='lw-sets'>";
+    sets.forEach((s,i)=>{
+      let v = s.weight!=null ? (s.weight+" lb × "+(s.reps??'?')) : (s.reps!=null ? (s.reps+" reps") : "—");
+      out+="<span class='lw-set'>"+(i+1)+": "+v+"</span>";
+    });
+    out+="</div>";
+  }
+  if(note) out+="<div class='lw-note'>“"+note.replace(/</g,'&lt;')+"”</div>";
+  return out;
+}
+
+function renderWeekStrip(){
+  const el=document.getElementById('weekstrip'); el.innerHTML='';
+  for(let w=1;w<=12;w++){
+    const p=w<=4?0:w<=8?1:2;
+    const b=document.createElement('button');
+    b.className='wk'+(w===curWeek?' active':'')+(weekDone(w)?' done':'');
+    b.innerHTML=`<small>Wk</small><b>${w}</b><small>${PHASES[p].name}</small>`;
+    b.onclick=()=>{curWeek=w;save();renderAll();window.scrollTo({top:0,behavior:'smooth'});};
+    el.appendChild(b);
+  }
+}
+function weekDone(w){
+  const days=buildWeek(w);
+  for(let d=0;d<days.length;d++){
+    if(days[d].optional) continue;
+    if(!store.done[`w${w}_d${d}`]) return false;
+  }
+  return true;
+}
+
+function renderPhase(){
+  const p=curWeek<=4?0:curWeek<=8?1:2; const ph=PHASES[p];
+  const el=document.getElementById('phasebar');
+  el.innerHTML=`<span class="phase-tag" style="background:${ph.color}">${ph.tag} · Week ${curWeek}</span>
+    <span class="phase-name">${ph.name}</span>
+    <span class="phase-focus">${ph.focus}</span>`;
+}
+
+function renderDays(){
+  const wrap=document.getElementById('days'); wrap.innerHTML='';
+  const week=buildWeek(curWeek);
+  week.forEach((day,di)=>{
+    const dk=`w${curWeek}_d${di}`;
+    const isDone=!!store.done[dk];
+    const isOpen = uiOpen[dk] ?? false;
+    const card=document.createElement('div');
+    card.className='day'+(day.rest?' rest':'')+(isDone?' done':'')+(isOpen?' open':'');
+    let h=`<button class="day-head" data-dayhead="${dk}">
+        <span class="day-headL">
+          <span class="day-tag">${day.tag}</span>
+          <span class="day-name">${day.name}<span class="where">${day.where}</span></span>
+        </span>
+        <span class="day-headR">
+          ${isDone?'<span class="day-check">✓</span>':''}
+          <span class="day-caret">${isOpen?'–':'+'}</span>
+        </span>
+      </button>
+      <div class="day-body" data-daybody="${dk}" style="display:${isOpen?'block':'none'}">`;
+    if(day.rest){
+      h+=`<div class="rest-body">Pick one. The goal is to move, not to grind.</div><div class="rest-opts">`;
+      day.options.forEach((o,oi)=>{
+        const k=`w${curWeek}_d${di}_opt${oi}`;
+        h+=`<label><input type="radio" name="rest_${curWeek}_${di}" ${store.rest[`w${curWeek}_d${di}`]==oi?'checked':''} data-rest="${curWeek}_${di}" value="${oi}"> ${o}</label>`;
+      });
+      h+=`</div>`;
+    } else {
+      day.ex.forEach(ex=>{
+        const lk=logKey(curWeek,di,ex.id);
+        const sets=getSets(lk);
+        const repsOnly = ex.unit==='reps';
+        const bwCap = !!ex.bw;
+        h+=`<div class="ex">
+          <div class="ex-top"><span class="ex-name">${ex.name}</span><span class="ex-prescr">${ex.pr}</span></div>
+          ${ex.note?`<div class="ex-note">${ex.note}</div>`:''}
+          ${curWeek>1?`<button class="lastwk-btn" data-lastwk="${di}|${ex.id}">↺ last wk</button><div class="lastwk-panel" data-lastwkpanel="${di}|${ex.id}" style="display:none"></div>`:''}
+          <div class="setlist" data-setlist="${lk}">`;
+        sets.forEach((s,si)=>{
+          const isBW = bwCap && s.bw!==false && (s.weight==null);
+          let weightCell;
+          if(bwCap && isBW){
+            weightCell = `<button class="bwpill active" data-bwtoggle="${lk}|${si}" title="Tap to add weight instead">BW</button><span class="unit">×</span>`;
+          } else if(bwCap){
+            weightCell = `<button class="bwpill" data-bwtoggle="${lk}|${si}" title="Tap for bodyweight">+wt</button><input type="number" inputmode="decimal" placeholder="wt" data-log="${lk}" data-si="${si}" data-f="weight" value="${s.weight??''}" style="width:46px"><span class="unit">lb ×</span>`;
+          } else {
+            weightCell = `<input type="number" inputmode="decimal" placeholder="${repsOnly?'—':'wt'}" data-log="${lk}" data-si="${si}" data-f="weight" value="${s.weight??''}" ${repsOnly?'disabled style="opacity:.35"':''}><span class="unit">${repsOnly?'':'lb ×'}</span>`;
+          }
+          h+=`<div class="ex-log" data-setrow="${lk}|${si}">
+            <span class="setnum">${si+1}</span>
+            ${weightCell}
+            <input type="number" inputmode="numeric" placeholder="reps" data-log="${lk}" data-si="${si}" data-f="reps" value="${s.reps??''}">
+            <span class="unit">reps</span>
+            <span class="pr-flag ${s.isPR?'show':''}" data-pr="${lk}|${si}">PR!</span>
+            ${sets.length>1?`<button class="setdel" data-del="${lk}|${si}" title="Remove set">×</button>`:''}
+          </div>`;
+        });
+        h+=`</div>
+          <button class="addset" data-add="${lk}">+ add set</button>
+          <input class="exnote" type="text" data-exnote="${lk}" placeholder="note for this exercise…" value="${(store.exnotes&&store.exnotes[lk])?String(store.exnotes[lk]).replace(/"/g,'&quot;'):''}">
+        </div>`;
+      });
+    }
+    h+=`<div class="notewrap"><textarea class="notebox" data-note="${dk}" placeholder="Notes — how the back felt, energy, form cues…">${(store.notes&&store.notes[dk])?store.notes[dk]:''}</textarea></div>`;
+    h+=`<div class="donerow"><input type="checkbox" data-done="${dk}" ${store.done[dk]?'checked':''}><label>Session complete</label></div>`;
+    h+=`</div>`; // close day-body
+    card.innerHTML=h;
+    wrap.appendChild(card);
+  });
+
+  wrap.querySelectorAll('button[data-dayhead]').forEach(b=>{
+    b.addEventListener('click',e=>{
+      const dk=b.dataset.dayhead;
+      uiOpen[dk]=!uiOpen[dk];
+      const body=wrap.querySelector(`[data-daybody="${dk}"]`);
+      const card=b.closest('.day');
+      const caret=b.querySelector('.day-caret');
+      if(uiOpen[dk]){ body.style.display='block'; card.classList.add('open'); if(caret)caret.textContent='–'; }
+      else { body.style.display='none'; card.classList.remove('open'); if(caret)caret.textContent='+'; }
+    });
+  });
+  wrap.querySelectorAll('input[data-log]').forEach(inp=>{
+    inp.addEventListener('input',onLog);
+  });
+  wrap.querySelectorAll('button[data-lastwk]').forEach(b=>{
+    b.addEventListener('click',e=>{
+      const [di,exId]=e.target.dataset.lastwk.split('|');
+      const panel=wrap.querySelector(`[data-lastwkpanel="${di}|${exId}"]`);
+      if(!panel) return;
+      if(panel.style.display==='none'){
+        panel.innerHTML=lastWeekSummary(+di, exId);
+        panel.style.display='block';
+        e.target.classList.add('open');
+        e.target.textContent='× hide';
+      } else {
+        panel.style.display='none';
+        e.target.classList.remove('open');
+        e.target.textContent='↺ last wk';
+      }
+    });
+  });
+  wrap.querySelectorAll('button[data-add]').forEach(b=>{
+    b.addEventListener('click',e=>{
+      const lk=e.target.dataset.add;
+      const sets=getSets(lk);
+      sets.push({});
+      store.log[lk]={sets};
+      save();renderDays();
+    });
+  });
+  wrap.querySelectorAll('button[data-del]').forEach(b=>{
+    b.addEventListener('click',e=>{
+      const [lk,si]=e.target.dataset.del.split('|');
+      const sets=getSets(lk);
+      sets.splice(+si,1);
+      store.log[lk]={sets};
+      recomputeBest();
+      save();renderDays();renderPR();
+    });
+  });
+  wrap.querySelectorAll('button[data-bwtoggle]').forEach(b=>{
+    b.addEventListener('click',e=>{
+      const [lk,si]=e.target.dataset.bwtoggle.split('|');
+      const sets=getSets(lk);
+      const s=sets[+si]||{};
+      if(s.bw===false){
+        // currently in weight mode -> switch to BW
+        s.bw=true; s.weight=undefined;
+      } else {
+        // currently BW -> switch to weight-entry mode
+        s.bw=false;
+      }
+      sets[+si]=s;
+      store.log[lk]={sets};
+      recomputeBest();
+      save();renderDays();renderPR();
+    });
+  });
+  wrap.querySelectorAll('input[data-exnote]').forEach(t=>{
+    t.addEventListener('input',e=>{
+      store.exnotes=store.exnotes||{};
+      const v=e.target.value;
+      if(v) store.exnotes[e.target.dataset.exnote]=v; else delete store.exnotes[e.target.dataset.exnote];
+      save();
+    });
+  });
+  wrap.querySelectorAll('textarea[data-note]').forEach(t=>{
+    t.addEventListener('input',e=>{
+      store.notes=store.notes||{};
+      const v=e.target.value;
+      if(v) store.notes[e.target.dataset.note]=v; else delete store.notes[e.target.dataset.note];
+      save();
+    });
+  });
+  wrap.querySelectorAll('input[data-done]').forEach(c=>{
+    c.addEventListener('change',e=>{
+      const dk=e.target.dataset.done;
+      store.done[dk]=e.target.checked;
+      if(e.target.checked){ snapshotSession(dk); }
+      else { store.history = store.history.filter(h=>h.key!==dk); }
+      save();renderWeekStrip();renderHistory();renderDays();
+    });
+  });
+  wrap.querySelectorAll('input[data-rest]').forEach(r=>{
+    r.addEventListener('change',e=>{
+      store.rest[`w${e.target.dataset.rest}`.replace('_','_d')]=+e.target.value;
+      // simpler key:
+      store.rest[`w${curWeek}_d`+e.target.dataset.rest.split('_')[1]]=+e.target.value;
+      save();
+    });
+  });
+}
+
+// Returns the sets array for an exercise, migrating old single-entry format.
+function getSets(lk){
+  const e=store.log[lk];
+  if(!e) return [{}];
+  if(Array.isArray(e.sets)) return e.sets.length?e.sets:[{}];
+  // migrate old {weight,reps,isPR} -> sets array
+  if('weight' in e || 'reps' in e){
+    const migrated=[{weight:e.weight, reps:e.reps}];
+    store.log[lk]={sets:migrated};
+    return migrated;
+  }
+  return [{}];
+}
+
+function onLog(e){
+  const lk=e.target.dataset.log, f=e.target.dataset.f, si=+e.target.dataset.si;
+  const sets=getSets(lk);
+  sets[si]=sets[si]||{};
+  sets[si][f]=e.target.value===''?undefined:+e.target.value;
+  store.log[lk]={sets};
+  recomputeBest();
+  save();
+  renderPR();
+  // live-update PR flag on this row
+  const exId=lk.split('_').slice(2).join('_');
+  const best=store.best[exId];
+  document.querySelectorAll(`[data-pr^="${lk}|"]`).forEach(f=>f.classList.remove('show'));
+  if(best && best.lk===lk && best.si!=null){
+    const flag=document.querySelector(`[data-pr="${lk}|${best.si}"]`);
+    if(flag) flag.classList.add('show');
+  }
+}
+
+// Recompute the single best set per exercise id across all weeks/days.
+function recomputeBest(){
+  store.best={};
+  Object.keys(store.log).forEach(lk=>{
+    const m=lk.match(/^w(\d+)_d(\d+)_(.+)$/); if(!m) return;
+    const week=+m[1], exId=m[3];
+    const sets=Array.isArray(store.log[lk]?.sets)?store.log[lk].sets:[];
+    sets.forEach((s,si)=>{
+      const score=prScore(s);
+      if(score>0 && score>(store.best[exId]?.score||0)){
+        store.best[exId]={score, weight:s.weight, reps:s.reps, week, lk, si};
+      }
+    });
+  });
+}
+function prScore(e){
+  if(!e) return 0;
+  const w=e.weight, r=e.reps;
+  if(w && r) return w*(1+r/30);   // estimated 1RM (Epley)
+  if(w && !r) return w;           // weight only still counts
+  if(r && !w) return r;           // bodyweight reps
+  return 0;
+}
+
+const PR_LIFTS=[
+  {id:'gm_hinge', label:'Hip Thrust'},
+  {id:'gm_rdl', label:'Romanian DL'},
+  {id:'g2_squat', label:'Squat'},
+  {id:'hm_press', label:'DB Press'},
+  {id:'hm_row', label:'DB Row'},
+  {id:'g2_carry', label:'Farmer Carry'},
+  {id:'hm_roman', label:'Back Extension'},
+  {id:'g2_pull', label:'Pulldown'}
+];
+function renderPR(){
+  const g=document.getElementById('prgrid'); g.innerHTML='';
+  PR_LIFTS.forEach(l=>{
+    const b=store.best?.[l.id];
+    const card=document.createElement('div'); card.className='pr-card';
+    if(b){
+      const val = b.weight ? `${b.weight}<small> lb × ${b.reps}</small>` : `${b.reps}<small> reps</small>`;
+      card.innerHTML=`<div class="lift">${l.label}</div><div class="val">${val}</div><div class="when">set week ${b.week}</div>`;
+    } else {
+      card.innerHTML=`<div class="lift">${l.label}</div><div class="empty">No log yet — go set the bar.</div>`;
+    }
+    g.appendChild(card);
+  });
+}
+
+function snapshotSession(dk){
+  // dk = wW_dD
+  const m = dk.match(/^w(\d+)_d(\d+)$/); if(!m) return;
+  const week=+m[1], di=+m[2];
+  const dayData = buildWeek(week)[di];
+  store.history = store.history.filter(h=>h.key!==dk);
+  let summary=[];
+  if(dayData.rest){
+    const choice = store.rest[`w${week}_d${di}`];
+    const label = choice!=null ? dayData.options[choice] : 'Recovery session';
+    summary=[{name:label, val:''}];
+  } else {
+    dayData.ex.forEach(ex=>{
+      const lk=logKey(week,di,ex.id);
+      const exSets=Array.isArray(store.log[lk]?.sets)?store.log[lk].sets:[];
+      const logged=exSets.filter(s=>s.weight||s.reps);
+      if(logged.length){
+        const v=logged.map(s=> s.weight ? `${s.weight}×${s.reps||'?'}` : `${s.reps}`).join(', ');
+        summary.push({name:ex.name, val:v});
+      }
+    });
+  }
+  store.history.push({
+    key:dk, week, day:di, name:dayData.name,
+    date:new Date().toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}),
+    sets:summary,
+    note:(store.notes&&store.notes[dk])?store.notes[dk]:''
+  });
+}
+function renderHistory(){
+  const el=document.getElementById('historyList'); el.innerHTML='';
+  if(!store.history || !store.history.length){
+    el.innerHTML='<div class="hist-empty">No completed sessions yet. Check "Session complete" on a day and it lands here with your logged numbers.</div>';
+    return;
+  }
+  const sorted=[...store.history].sort((a,b)=> b.week-a.week || b.day-a.day);
+  sorted.forEach(h=>{
+    const row=document.createElement('div'); row.className='hist-row';
+    const setsTxt = h.sets.length
+      ? h.sets.map(s=> s.val ? `${s.name} — ${s.val}` : s.name).join(' · ')
+      : 'completed (no sets logged)';
+    row.innerHTML=`<div class="hh">Week <b>${h.week}</b> · ${h.name} · ${h.date}</div><div class="hsets">${setsTxt}</div>${h.note?`<div class="hnote">“${h.note}”</div>`:''}`;
+    el.appendChild(row);
+  });
+}
+
+function renderAll(){ renderWeekStrip(); renderPhase(); renderDays(); renderPR(); renderHistory(); if(currentView==='dashboard') renderDashboard(); }
+
+// ---------- VIEW SWITCHING ----------
+let currentView='workouts';
+function switchView(v){
+  currentView=v;
+  document.getElementById('view-workouts').style.display = v==='workouts'?'block':'none';
+  document.getElementById('view-dashboard').style.display = v==='dashboard'?'block':'none';
+  document.getElementById('tabWorkouts').classList.toggle('active', v==='workouts');
+  document.getElementById('tabDash').classList.toggle('active', v==='dashboard');
+  if(v==='dashboard') renderDashboard();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.getElementById('tabWorkouts').addEventListener('click',()=>switchView('workouts'));
+document.getElementById('tabDash').addEventListener('click',()=>switchView('dashboard'));
+
+// ---------- DASHBOARD ----------
+const REQUIRED_DAYS=[0,1,2]; // core training days
+let dashLift=null; // selected lift for PR chart
+
+function weekCoreDone(w){
+  return REQUIRED_DAYS.every(d=>store.done[`w${w}_d${d}`]);
+}
+function currentStreak(){
+  // count consecutive completed core-weeks ending at the latest completed week
+  let streak=0, run=0;
+  for(let w=1;w<=12;w++){
+    if(weekCoreDone(w)){ run++; streak=Math.max(streak,run); }
+    else run=0;
+  }
+  // "current" streak = trailing run up to the last done week
+  let trailing=0;
+  for(let w=12;w>=1;w--){
+    if(weekCoreDone(w)){ trailing++; } else if(trailing>0){ break; }
+  }
+  return {best:streak, current:trailing};
+}
+function sessionsStats(){
+  let done=0, planned=0;
+  for(let w=1;w<=12;w++){ REQUIRED_DAYS.forEach(d=>{ planned++; if(store.done[`w${w}_d${d}`]) done++; }); }
+  return {done, planned};
+}
+function weekVolume(w){
+  let vol=0;
+  for(let d=0; d<3; d++){
+    Object.keys(store.log).forEach(lk=>{
+      if(!lk.startsWith(`w${w}_d${d}_`)) return;
+      const sets=Array.isArray(store.log[lk]?.sets)?store.log[lk].sets:[];
+      sets.forEach(s=>{ if(s.weight&&s.reps) vol+=s.weight*s.reps; });
+    });
+  }
+  return vol;
+}
+// PR (est 1RM) per week for a given exercise id
+function liftSeries(exId){
+  const pts=[];
+  for(let w=1;w<=12;w++){
+    let best=0, bestDisp=null;
+    Object.keys(store.log).forEach(lk=>{
+      const m=lk.match(/^w(\d+)_d\d+_(.+)$/);
+      if(!m || +m[1]!==w || m[2]!==exId) return;
+      const sets=Array.isArray(store.log[lk]?.sets)?store.log[lk].sets:[];
+      sets.forEach(s=>{ const sc=prScore(s); if(sc>best){best=sc; bestDisp=s;} });
+    });
+    pts.push({w, score:best, disp:bestDisp});
+  }
+  return pts;
+}
+
+function renderDashboard(){
+  const el=document.getElementById('dashInner');
+  const st=sessionsStats();
+  const streak=currentStreak();
+  const pct=st.planned?Math.round(st.done/st.planned*100):0;
+  const anyData = st.done>0;
+
+  let h='';
+  // hero stats
+  h+=`<div class="dash-hero">
+    <div class="dash-stat"><div class="lbl">Current streak</div><div class="big">${streak.current}<small> wk${streak.current===1?'':'s'}</small></div><div class="sub">Best: ${streak.best} · full training weeks in a row</div></div>
+    <div class="dash-stat"><div class="lbl">Program</div><div class="big">${pct}<small>%</small></div><div class="sub">${st.done} of ${st.planned} core sessions done</div></div>
+  </div>`;
+
+  // calendar heatmap
+  h+=`<div class="dash-sec"><h2>12-Week Calendar</h2><div class="heat">
+    <span class="hlabel"></span><span class="hcol">D1</span><span class="hcol">D2</span><span class="hcol">D3</span><span class="hcol">D4</span><span class="hcol">D5</span>`;
+  for(let w=1;w<=12;w++){
+    h+=`<span class="hlabel">Wk ${w}</span>`;
+    for(let d=0; d<5; d++){
+      const done=!!store.done[`w${w}_d${d}`];
+      const opt=(d>=3);
+      let cls='cell'+(opt?' opt':'')+(done?(opt?' optdone':' done'):'');
+      h+=`<span class="${cls}">${done?'✓':''}</span>`;
+    }
+  }
+  h+=`</div><div class="sub" style="margin-top:10px;font-size:11px;color:var(--sage-deep)">Green = training day · clay = bonus recovery. Fill the grid.</div></div>`;
+
+  // PR progress table
+  h+=`<div class="dash-sec"><h2>Strength Progress</h2>`;
+  if(!anyData){
+    h+=`<div class="dash-empty">Log a few sessions and your week-by-week progress will appear here.</div>`;
+  } else {
+    if(!dashLift) dashLift=PR_LIFTS[0].id;
+    h+=`<div class="chip-row">`;
+    PR_LIFTS.forEach(l=>{ h+=`<button class="chip ${l.id===dashLift?'active':''}" data-lift="${l.id}">${l.label}</button>`; });
+    h+=`</div><div id="prTable"></div>`;
+  }
+  h+=`</div>`;
+
+  el.innerHTML=h;
+
+  // wire lift chips
+  el.querySelectorAll('.chip[data-lift]').forEach(c=>{
+    c.addEventListener('click',()=>{ dashLift=c.dataset.lift; renderDashboard(); });
+  });
+  if(anyData) drawPRTable(dashLift);
+}
+
+// Best logged set per week, shown as real numbers (no estimated 1RM).
+function drawPRTable(exId){
+  const wrap=document.getElementById('prTable'); if(!wrap) return;
+  const meta=PR_LIFTS.find(l=>l.id===exId);
+  // gather each week's best set (by prScore, but DISPLAY raw values)
+  const rows=[];
+  let prevScore=null;
+  for(let w=1;w<=12;w++){
+    let best=null, bestScore=0;
+    Object.keys(store.log).forEach(lk=>{
+      const m=lk.match(/^w(\d+)_d\d+_(.+)$/);
+      if(!m || +m[1]!==w || m[2]!==exId) return;
+      const sets=Array.isArray(store.log[lk]?.sets)?store.log[lk].sets:[];
+      sets.forEach(s=>{ const sc=prScore(s); if(sc>bestScore){bestScore=sc; best=s;} });
+    });
+    if(best){
+      let disp = best.weight!=null ? `${best.weight} lb × ${best.reps??'?'}` : (best.reps!=null?`${best.reps} reps`:'—');
+      let trend='';
+      if(prevScore!=null){
+        if(bestScore>prevScore) trend='up';
+        else if(bestScore<prevScore) trend='down';
+        else trend='same';
+      }
+      rows.push({w, disp, trend});
+      prevScore=bestScore;
+    }
+  }
+  if(!rows.length){ wrap.innerHTML=`<div class="dash-empty">No logged sets for this lift yet.</div>`; return; }
+  let h=`<table class="pr-table"><thead><tr><th>Week</th><th>Best set</th><th></th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const arrow = r.trend==='up'?'<span class="tr-up">▲</span>' : r.trend==='down'?'<span class="tr-down">▼</span>' : (r.trend==='same'?'<span class="tr-same">–</span>':'');
+    h+=`<tr><td class="wk">Wk ${r.w}</td><td class="val">${r.disp}</td><td class="tr">${arrow}</td></tr>`;
+  });
+  h+=`</tbody></table><div class="sub" style="font-size:11px;margin-top:8px">Your best set each week. ▲ = heavier or more reps than the week before.</div>`;
+  wrap.innerHTML=h;
+}
+
+function drawPRChart_UNUSED(exId){
+  const wrap=document.getElementById('prChart'); if(!wrap) return;
+  const series=liftSeries(exId).filter(p=>p.score>0);
+  if(series.length===0){ wrap.innerHTML=`<div class="dash-empty">No logged sets for this lift yet.</div>`; return; }
+  const W=320,H=160,pad=28;
+  const xs=liftSeries(exId).map(p=>p.w);
+  const minW=1,maxW=12;
+  const vals=series.map(p=>p.score);
+  const minV=Math.min(...vals), maxV=Math.max(...vals);
+  const span=(maxV-minV)||1;
+  function X(w){ return pad + (w-minW)/(maxW-minW)*(W-pad*1.4); }
+  function Y(v){ return H-pad - (v-minV)/span*(H-pad*1.6); }
+  let path='';
+  series.forEach((p,i)=>{ path+=(i===0?'M':'L')+X(p.w).toFixed(1)+' '+Y(p.score).toFixed(1)+' '; });
+  let dots='';
+  series.forEach(p=>{ dots+=`<circle cx="${X(p.w).toFixed(1)}" cy="${Y(p.score).toFixed(1)}" r="3.2" fill="#b56a47"/>`; });
+  // y labels
+  const yTop=maxV, yBot=minV;
+  const svg=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+    <line x1="${pad}" y1="${H-pad}" x2="${W-6}" y2="${H-pad}" stroke="#cfc8b6"/>
+    <line x1="${pad}" y1="${pad-8}" x2="${pad}" y2="${H-pad}" stroke="#cfc8b6"/>
+    <text x="4" y="${Y(yTop).toFixed(1)+4}" font-size="9" fill="#3d4a39" font-family="monospace">${Math.round(yTop)}</text>
+    <text x="4" y="${(H-pad)}" font-size="9" fill="#3d4a39" font-family="monospace">${Math.round(yBot)}</text>
+    <path d="${path}" fill="none" stroke="#5a6b54" stroke-width="2.2"/>
+    ${dots}
+    <text x="${pad}" y="${H-8}" font-size="9" fill="#3d4a39" font-family="monospace">Wk ${series[0].w}</text>
+    <text x="${W-30}" y="${H-8}" font-size="9" fill="#3d4a39" font-family="monospace">Wk ${series[series.length-1].w}</text>
+  </svg>
+  <div class="sub" style="font-size:11px;margin-top:4px">Estimated 1-rep max trend (higher = stronger). Bodyweight lifts show reps.</div>`;
+  wrap.innerHTML=svg;
+}
+
+recomputeBest();
+renderAll();
+loadRemote();
+
+document.getElementById('resetBtn').addEventListener('click', async ()=>{
+  if(confirm('Clear all logged sets, PRs, and completed sessions on every device? This cannot be undone.')){
+    store=blank(); store.curWeek=1; curWeek=1;
+    try{localStorage.removeItem(KEY);}catch(e){}
+    renderAll();
+    if(sb){
+      try{ await sb.from('tracker_state').upsert({id:ROW_ID, data:store, updated_at:new Date().toISOString()}); setSync('Synced', true);}catch(e){ setSync('Offline', false);}
+    }
+  }
+});
+</script>
+<script>
+(function(){
+  var lower = [
+    "Cat-cow ×8 + bird-dog ×8 ea — wake up spine & core",
+    "Glute bridge ×15 — fire the glutes first",
+    "Banded side step ×10 ea — switch on glute med",
+    "Bodyweight squat ×10 + hip hinge ×10 — groove the patterns",
+    "1 light warm-up set of your first lift"
+  ];
+  var upper = [
+    "Arm circles + band pull-apart ×15",
+    "Cat-cow ×8 + thoracic rotations ×6 ea — open the upper back",
+    "Scap push-up ×10",
+    "1 light warm-up set of your first lift"
+  ];
+  var recovery = ["No separate warm-up needed — these days are the easy movement. If running, walk 2 min before easing into the jog."];
+  function block(title, items){
+    var h = "<div style='font-family:\"Courier New\",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#b56a47;margin:12px 0 5px'>"+title+"</div><ul style='list-style:none;padding:0;margin:0'>";
+    for(var i=0;i<items.length;i++){
+      h += "<li style='border-left:3px solid #5a6b54;padding:3px 0 3px 11px;margin-bottom:5px'>"+items[i]+"</li>";
+    }
+    return h + "</ul>";
+  }
+  var body=document.getElementById("warmupBody");
+  body.innerHTML =
+    block("Lower days (Day 1 & Day 3)", lower) +
+    block("Upper day (Day 2)", upper) +
+    block("Recovery days (Day 4 & 5)", recovery) +
+    "<div style='font-size:12.5px;font-style:italic;color:#3d4a39;margin-top:10px'>Still stiff after the circuit? Add one more easy set before loading up.</div>";
+  var open=false;
+  document.getElementById("warmupToggle").addEventListener("click",function(){
+    open=!open;
+    body.style.display = open?"block":"none";
+    document.getElementById("warmupCaret").textContent = open?"–":"+";
+    document.getElementById("warmupLabel").innerHTML = (open?"▾":"▸")+" Warm-up <span style='color:#3d4a39;letter-spacing:.04em'>— 5–8 min before lifting</span>";
+  });
+})();
+</script>
+</body>
+</html>
